@@ -1,0 +1,129 @@
+---
+title: "Machine learning"
+output: html_document
+---
+
+The purpose of this report is to develop a model to predict how well barbell lifts are performed given data using inputs from accelerometers on the belt, forearm, arm, and dumbell of an individual.
+
+The following approach is used:
+
+Step 1: Obtain the data based on which the model will be created
+Step 2: Clean the data set by:
+        - removing variables with no values
+        - removing variables with near zero variance i.e. varaibles that contain one value more than others and hence they are unlikely to add additiona information to the prediction
+        - removing highly correlated varaibles (with greater than 0.9 correlation)
+Step 3: Divide the data set into training and testing to be able to calculate out of sample error
+Step 4: Explore several predictive algorithms and choose the one that produces the highest accuracy on the testing set
+
+
+Load the appropriate R packages.
+
+```{r}
+library(caret)
+library(dplyr)
+```
+
+###############################################################
+Step 1:Obtain the data based on which the model will be created
+###############################################################
+
+```{r}
+
+modelData <- read.csv("D:/Data science specialisation/7. Machine learning/training.csv")
+```
+Note that if you run the above code you need to change it to be consistent with the file management system on your PC.
+
+###############################################################
+Step 2:  Clean the data set
+###############################################################
+
+First, we summarise the variables in the data set and remove the ones with no values.
+
+```{r}
+glimpse(modelData)
+```
+
+After visually inspecting each varaibles, we select the following variables to use in the model build.
+
+```{r}
+modelData <- select(modelData, classe, raw_timestamp_part_1,raw_timestamp_part_2 ,new_window ,num_window,roll_belt,pitch_belt,yaw_belt,total_accel_belt,
+                   gyros_belt_x,gyros_belt_y,gyros_belt_z,accel_belt_x,accel_belt_y,accel_belt_z,magnet_belt_x,magnet_belt_y,
+                   magnet_belt_z,roll_arm ,pitch_arm,yaw_arm,total_accel_arm,gyros_arm_x,gyros_arm_y,gyros_arm_z,
+                   accel_arm_x,accel_arm_y,accel_arm_z,magnet_arm_x,magnet_arm_y,magnet_arm_z,roll_dumbbell,
+                   pitch_dumbbell,yaw_dumbbell,total_accel_dumbbell ,gyros_dumbbell_x,gyros_dumbbell_y,gyros_dumbbell_z,
+                   accel_dumbbell_x,accel_dumbbell_y,accel_dumbbell_z,magnet_dumbbell_x,magnet_dumbbell_y,magnet_dumbbell_z,
+                   roll_forearm ,pitch_forearm ,yaw_forearm ,total_accel_forearm ,gyros_forearm_x ,gyros_forearm_y,gyros_forearm_z,
+                   accel_forearm_x,accel_forearm_y,accel_forearm_z,magnet_forearm_x ,magnet_forearm_y,magnet_forearm_z)
+```
+
+Next, remove any observations that contain NAs.
+
+```{r}
+cleaned <- complete.cases(modelData)
+modelData <- modelData[cleaned,]
+```
+
+Remove any near zero variance variables.
+
+```{r}
+nzv <- nearZeroVar(modelData, saveMetrics= TRUE)
+nzv[nzv$nzv,][1:nrow(nzv),]
+modelData <- select(modelData,-new_window)
+```
+
+Remove any high correlation varaibles.
+
+```{r}
+f <- select(modelData,-classe)
+t <- findCorrelation(cor(f),cutoff = 0.9)
+f<-f[,-t]
+classe <- modelData$classe
+
+#the final data set to be used for the model build
+modelDataFinal <- cbind(classe,f)
+```
+
+###############################################################
+Step 3: Divide the data set into training and testing to be able to calculate out of sample error
+###############################################################
+
+
+```{r}
+inTraining <- createDataPartition(modelDataFinal$classe, p=0.6)[[1]]
+training <- modelDataFinal[inTraining,]
+testing <- modelDataFinal[-inTraining,]
+```
+
+###############################################################
+Step 4: Explore several predictive algorithms and choose the one that produces the highest accuracy on the testing set
+###############################################################
+
+Given that the variable that we will need to predict is categorical, we will not try to build linear regression
+model because the normality assumption will be invalid.
+
+First, we build a regression tree.
+
+```{r}
+set.seed(123123)
+
+regressionTreemodel <- train(training$classe~.,method = "rpart",data = training)
+
+#determine the accuracy
+confusionMatrix(testing$classe,predict(regressionTreemodel,testing))
+```
+
+The accuracy of the regression tree is between 52% and 54% with 95% confidence.
+
+
+Second, we build a random forest.
+
+```{r}
+randonForestmodel <- train(training$classe~.,method = "rf",data = training)
+
+#determine the accuracy
+confusionMatrix(testing$classe,predict(randonForestmodel,testing))
+```
+
+The accuracy of the random forest is between 99.7% and 99.9% with 95% confidence.
+
+Given the high accuracy of the random forest approach, we will not test any further algorithms.
